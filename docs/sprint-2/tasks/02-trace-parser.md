@@ -2,7 +2,7 @@
 
 **Sprint:** 2 — Data Model & Trace Parsing  
 **Branch:** `feature/sprint-2-task-02-trace-parser`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/5  
 **Depends on:** Sprint 2 / Task 01 (data model must exist)
 
 ---

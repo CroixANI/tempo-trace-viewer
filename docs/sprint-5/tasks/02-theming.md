@@ -2,7 +2,7 @@
 
 **Sprint:** 5 — Search & Polish  
 **Branch:** `feature/sprint-5-task-02-theming`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/15  
 **Depends on:** Sprint 1 / Task 01 (fonts directory must exist)
 
 ---

@@ -2,7 +2,7 @@
 
 **Sprint:** 1 — Project Scaffold  
 **Branch:** `feature/sprint-1-task-01-init-project`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/3  
 **Depends on:** None
 
 ---

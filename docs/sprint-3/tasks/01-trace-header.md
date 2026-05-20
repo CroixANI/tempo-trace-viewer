@@ -2,7 +2,7 @@
 
 **Sprint:** 3 — Trace Visualization  
 **Branch:** `feature/sprint-3-task-01-trace-header`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/7  
 **Depends on:** Sprint 2 / Task 03 (IPC command must exist; `TraceView` type available)
 
 ---
