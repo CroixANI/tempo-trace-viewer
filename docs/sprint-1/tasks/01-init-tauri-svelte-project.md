@@ -47,12 +47,21 @@ All subsequent sprint tasks build on top of this scaffold.
 
 ---
 
-## Dependency Age Check
+## Dependency Age Check and Version Pinning
 
 Before adding any crate or npm package, run the check scripts from `AGENT.md` Section 3.1
 and include the results in your pre-commit review summary.
 
 Key crates to verify: `serde`, `serde_json`, `tracing`, `tracing-subscriber`, `tracing-appender`, `thiserror`.
+
+**Pin to exact versions in `Cargo.toml`** — use `=` prefix for all dependencies:
+```toml
+serde = { version = "=1.0.219", features = ["derive"] }
+serde_json = "=1.0.140"
+```
+Look up the current latest version on crates.io and pin to that exact version.
+The same applies to `package.json` — use exact versions without `^` or `~` prefixes.
+`Cargo.lock` and `pnpm-lock.yaml` must both be committed.
 
 ---
 
