@@ -2,7 +2,7 @@
 
 **Sprint:** 4 — Log Loading & Correlation  
 **Branch:** `feature/sprint-4-task-04-log-ui`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/13  
 **Depends on:** Sprint 4 / Task 02 (correlation command must exist); Sprint 3 / Task 03 (LogsSection placeholder must exist)
 
 ---

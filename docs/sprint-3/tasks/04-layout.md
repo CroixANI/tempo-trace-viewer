@@ -2,7 +2,7 @@
 
 **Sprint:** 3 — Trace Visualization  
 **Branch:** `feature/sprint-3-task-03-layout`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/10  
 **Depends on:** Sprint 3 / Task 03 (SpanTree and SpanDetail must exist)
 
 ---

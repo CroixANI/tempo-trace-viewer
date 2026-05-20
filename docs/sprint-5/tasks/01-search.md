@@ -2,7 +2,7 @@
 
 **Sprint:** 5 — Search & Polish  
 **Branch:** `feature/sprint-5-task-01-search`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/14  
 **Depends on:** Sprint 3 / Task 02 (SpanTree must exist); Sprint 4 / Task 03 (logs in stores)
 
 ---

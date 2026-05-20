@@ -2,7 +2,7 @@
 
 **Sprint:** 2 — Data Model & Trace Parsing  
 **Branch:** `feature/sprint-2-task-01-rust-data-model`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/4  
 **Depends on:** Sprint 1 / Task 01 (project scaffold must exist)
 
 ---

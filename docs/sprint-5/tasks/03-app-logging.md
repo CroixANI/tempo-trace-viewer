@@ -2,7 +2,7 @@
 
 **Sprint:** 5 — Search & Polish  
 **Branch:** `feature/sprint-5-task-03-app-logging`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/16  
 **Depends on:** Sprint 2 / Task 03 (logging.rs stub must exist)
 
 ---

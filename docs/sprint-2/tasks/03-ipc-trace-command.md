@@ -2,7 +2,7 @@
 
 **Sprint:** 2 — Data Model & Trace Parsing  
 **Branch:** `feature/sprint-2-task-03-ipc-trace-command`  
-**GitHub Issue:** <!-- Added in Phase 2 -->  
+**GitHub Issue:** https://github.com/CroixANI/tempo-trace-viewer/issues/6  
 **Depends on:** Sprint 2 / Task 02 (trace parser must exist)
 
 ---
