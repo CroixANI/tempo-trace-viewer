@@ -1,0 +1,35 @@
+#!/bin/sh
+# Pre-commit security audit hook.
+# Runs cargo audit when Rust dependency files change.
+# Runs pnpm audit when the frontend lock file changes.
+# Install once per clone: git config core.hooksPath .githooks
+
+STAGED=$(git diff --cached --name-only)
+
+# --- Rust audit ---
+if echo "$STAGED" | grep -qE '(Cargo\.toml|Cargo\.lock)'; then
+    echo "🔍 cargo audit — checking Rust dependencies for known vulnerabilities..."
+    if ! cargo audit; then
+        echo ""
+        echo "❌ cargo audit found vulnerabilities. Fix them before committing."
+        echo "   To see details: cargo audit"
+        echo "   To ignore a specific advisory (with justification): cargo audit --ignore RUSTSEC-XXXX-XXXX"
+        exit 1
+    fi
+    echo "✅ cargo audit passed."
+fi
+
+# --- Frontend audit ---
+if echo "$STAGED" | grep -q 'pnpm-lock\.yaml'; then
+    echo "🔍 pnpm audit — checking frontend dependencies for known vulnerabilities..."
+    if ! pnpm audit; then
+        echo ""
+        echo "❌ pnpm audit found vulnerabilities. Fix them before committing."
+        echo "   To see details: pnpm audit"
+        echo "   To allow a specific advisory: add to .pnpmfile.cjs or update the dependency."
+        exit 1
+    fi
+    echo "✅ pnpm audit passed."
+fi
+
+exit 0

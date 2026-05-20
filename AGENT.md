@@ -18,6 +18,14 @@ Key documents:
 - `docs/PRD.md` — product requirements, features, performance targets
 - `docs/ARCHITECTURE.md` — technical architecture, data model, IPC contract, crate choices
 
+## First-time setup (after cloning)
+
+After cloning the repository, activate the pre-commit security hooks:
+```bash
+git config core.hooksPath .githooks
+```
+This enables automatic `cargo audit` and `pnpm audit` checks on every commit that touches dependency files.
+
 ---
 
 ## 2. Workflow Rules
