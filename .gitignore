@@ -29,6 +29,7 @@ dist/
 
 # Tauri build output
 src-tauri/target/
+src-tauri/gen/
 
 # Rust learning notes — personal, not committed
 docs/sprint-*/rust-notes/
