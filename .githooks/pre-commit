@@ -9,7 +9,7 @@ STAGED=$(git diff --cached --name-only)
 # --- Rust audit ---
 if echo "$STAGED" | grep -qE '(Cargo\.toml|Cargo\.lock)'; then
     echo "🔍 cargo audit — checking Rust dependencies for known vulnerabilities..."
-    if ! cargo audit; then
+    if ! (cd src-tauri && cargo audit); then
         echo ""
         echo "❌ cargo audit found vulnerabilities. Fix them before committing."
         echo "   To see details: cargo audit"
