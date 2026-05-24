@@ -25,6 +25,8 @@ pub struct SpanView {
     pub start_time_unix_nano: u64,
     pub duration_ns: u64,
     pub relative_start_ns: u64,
+    pub relative_start_pct: f64,
+    pub duration_pct: f64,
     pub depth: u32,
     pub has_error: bool,
     pub attributes: Vec<KeyValue>,
