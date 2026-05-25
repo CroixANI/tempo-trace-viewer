@@ -1,6 +1,16 @@
+<script lang="ts">
+  import { invoke } from '@tauri-apps/api/core';
+
+  async function loadTrace() {
+    const result = await invoke('load_trace');
+    console.log('TraceView:', result);
+  }
+</script>
+
 <main>
   <h1>Tempo Trace Viewer</h1>
   <p>Load a Tempo trace file to get started.</p>
+  <button onclick={loadTrace}>Load Trace</button>
 </main>
 
 <style>
