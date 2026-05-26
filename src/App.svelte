@@ -1,11 +1,13 @@
 <script lang="ts">
   import Toolbar from './lib/components/Toolbar.svelte';
   import TraceHeader from './lib/components/TraceHeader.svelte';
+  import SpanTree from './lib/components/SpanTree.svelte';
 </script>
 
 <div class="app">
   <Toolbar />
   <TraceHeader />
+  <SpanTree />
 </div>
 
 <style>
