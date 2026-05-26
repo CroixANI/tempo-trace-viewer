@@ -1,15 +1,13 @@
 <script lang="ts">
   import Toolbar from './lib/components/Toolbar.svelte';
   import TraceHeader from './lib/components/TraceHeader.svelte';
-  import SpanTree from './lib/components/SpanTree.svelte';
-  import SpanDetail from './lib/components/SpanDetail.svelte';
+  import MainLayout from './lib/components/MainLayout.svelte';
 </script>
 
 <div class="app">
   <Toolbar />
   <TraceHeader />
-  <SpanTree />
-  <SpanDetail />
+  <MainLayout />
 </div>
 
 <style>
@@ -17,6 +15,7 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    overflow: hidden;
     font-family: var(--font-sans);
     background-color: var(--color-bg);
     color: var(--color-text-primary);
