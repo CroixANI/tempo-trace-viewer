@@ -15,4 +15,8 @@
   /* Span tree */
   --span-row-height-base: 32px;
   --gantt-bar-height: 16px;
+  --span-indent-width: 16px;
+  --gantt-area-width: 40%;
+  --color-selected-bg: #e8f1ff;
+  --color-row-hover: #f4f4f4;
 }

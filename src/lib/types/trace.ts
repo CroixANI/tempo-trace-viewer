@@ -32,6 +32,8 @@ export interface SpanView {
   start_time_unix_nano: number;
   duration_ns: number;
   relative_start_ns: number;
+  relative_start_pct: number;
+  duration_pct: number;
   depth: number;
   has_error: boolean;
   attributes: KeyValue[];
