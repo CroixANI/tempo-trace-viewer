@@ -432,6 +432,38 @@ fn parse_int_value(v: &serde_json::Value) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::trace::AnyValue;
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    fn one_span(
+        trace_id: &str,
+        span_id: &str,
+        parent_span_id: Option<&str>,
+        name: &str,
+        service: &str,
+        start: u64,
+        end: u64,
+    ) -> String {
+        let parent_field = match parent_span_id {
+            Some(p) => format!(r#","parentSpanId": "{p}""#),
+            None => String::new(),
+        };
+        format!(
+            r#"{{
+                "batches": [{{
+                    "resource": {{"attributes": [{{"key": "service.name", "value": {{"stringValue": "{service}"}}}}]}},
+                    "instrumentationLibrarySpans": [{{"spans": [
+                        {{"traceId": "{trace_id}", "spanId": "{span_id}"{parent_field},
+                          "name": "{name}",
+                          "startTimeUnixNano": {start}, "endTimeUnixNano": {end}}}
+                    ]}}]
+                }}]
+            }}"#
+        )
+    }
+
+    // ── integration test against the real example file ────────────────────
 
     #[test]
     fn test_parse_example_trace() {
@@ -441,32 +473,382 @@ mod tests {
         let result = parse_trace_file(&path).unwrap();
         assert_eq!(result.span_count, 578);
         assert_eq!(result.error_count, 17);
+        assert_eq!(result.service_count, 21);
+        assert_eq!(result.root_service_name, "nimbusteamsdriver");
+        assert_eq!(result.root_operation_name, "New Conversation");
         assert!(!result.trace_id.is_empty());
     }
 
+    // ── TraceView top-level fields ────────────────────────────────────────
+
     #[test]
-    fn test_parse_empty_trace() {
+    fn test_parse_empty_batches() {
         let result = parse_trace_str(r#"{"batches": []}"#).unwrap();
         assert_eq!(result.span_count, 0);
+        assert_eq!(result.error_count, 0);
+        assert_eq!(result.service_count, 0);
+        assert_eq!(result.duration_ns, 0);
     }
 
     #[test]
-    fn test_depth_calculation() {
+    fn test_single_span_all_trace_view_fields() {
+        let json = one_span("tid01", "sid01", None, "HTTP GET", "api-gateway", 1_000, 5_000);
+        let result = parse_trace_str(&json).unwrap();
+        assert_eq!(result.trace_id, "tid01");
+        assert_eq!(result.root_service_name, "api-gateway");
+        assert_eq!(result.root_operation_name, "HTTP GET");
+        assert_eq!(result.start_time_unix_nano, 1_000);
+        assert_eq!(result.duration_ns, 4_000);
+        assert_eq!(result.span_count, 1);
+        assert_eq!(result.service_count, 1);
+        assert_eq!(result.error_count, 0);
+    }
+
+    // ── root span detection ───────────────────────────────────────────────
+
+    #[test]
+    fn test_root_when_parent_id_absent() {
+        let json = one_span("t", "s1", None, "op", "svc", 0, 1000);
+        let result = parse_trace_str(&json).unwrap();
+        assert_eq!(result.spans[0].depth, 0);
+        assert!(result.spans[0].parent_span_id.is_none());
+    }
+
+    #[test]
+    fn test_root_when_parent_id_is_empty_string() {
         let json = r#"{
-            "batches": [{
-                "resource": {"attributes": []},
+            "batches": [{"resource": {"attributes": []},
                 "instrumentationLibrarySpans": [{"spans": [
-                    {"traceId": "abc", "spanId": "parent01", "name": "parent",
-                     "startTimeUnixNano": 1000, "endTimeUnixNano": 2000},
-                    {"traceId": "abc", "spanId": "child001", "parentSpanId": "parent01",
-                     "name": "child", "startTimeUnixNano": 1100, "endTimeUnixNano": 1900}
+                    {"traceId": "t", "spanId": "s1", "parentSpanId": "",
+                     "name": "op", "startTimeUnixNano": 0, "endTimeUnixNano": 100}
                 ]}]
             }]
         }"#;
         let result = parse_trace_str(json).unwrap();
-        let parent = result.spans.iter().find(|s| s.span_id == "parent01").unwrap();
-        let child = result.spans.iter().find(|s| s.span_id == "child001").unwrap();
-        assert_eq!(parent.depth, 0);
-        assert_eq!(child.depth, 1);
+        assert_eq!(result.spans[0].depth, 0);
+    }
+
+    #[test]
+    fn test_root_when_parent_not_in_trace() {
+        // parentSpanId points to a span that does not exist in this trace.
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s1", "parentSpanId": "ghost99",
+                     "name": "op", "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.spans[0].depth, 0);
+        assert!(result.spans[0].parent_span_id.is_none());
+    }
+
+    // ── depth and DFS ordering ────────────────────────────────────────────
+
+    #[test]
+    fn test_depth_three_levels() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "root", "name": "root",
+                     "startTimeUnixNano": 1000, "endTimeUnixNano": 5000},
+                    {"traceId": "t", "spanId": "child", "parentSpanId": "root",
+                     "name": "child", "startTimeUnixNano": 1100, "endTimeUnixNano": 4900},
+                    {"traceId": "t", "spanId": "grand", "parentSpanId": "child",
+                     "name": "grand", "startTimeUnixNano": 1200, "endTimeUnixNano": 4800}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        let s = |id: &str| result.spans.iter().find(|s| s.span_id == id).unwrap();
+        assert_eq!(s("root").depth, 0);
+        assert_eq!(s("child").depth, 1);
+        assert_eq!(s("grand").depth, 2);
+    }
+
+    #[test]
+    fn test_dfs_output_order() {
+        // Tree: root → child_a → grandchild; root → child_b
+        // child_a starts before child_b, so DFS order: root, child_a, grandchild, child_b
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "root",       "name": "root",
+                     "startTimeUnixNano": 1000, "endTimeUnixNano": 5000},
+                    {"traceId": "t", "spanId": "child_a",    "parentSpanId": "root",
+                     "name": "child_a", "startTimeUnixNano": 1100, "endTimeUnixNano": 2500},
+                    {"traceId": "t", "spanId": "grandchild", "parentSpanId": "child_a",
+                     "name": "grandchild", "startTimeUnixNano": 1200, "endTimeUnixNano": 2400},
+                    {"traceId": "t", "spanId": "child_b",    "parentSpanId": "root",
+                     "name": "child_b", "startTimeUnixNano": 2600, "endTimeUnixNano": 4900}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        let ids: Vec<&str> = result.spans.iter().map(|s| s.span_id.as_str()).collect();
+        assert_eq!(ids, ["root", "child_a", "grandchild", "child_b"]);
+    }
+
+    #[test]
+    fn test_multiple_roots_sorted_by_start_time() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "late_root",  "name": "late",
+                     "startTimeUnixNano": 2000, "endTimeUnixNano": 3000},
+                    {"traceId": "t", "spanId": "early_root", "name": "early",
+                     "startTimeUnixNano": 1000, "endTimeUnixNano": 1500}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.spans[0].span_id, "early_root");
+        assert_eq!(result.spans[1].span_id, "late_root");
+        // root_service derives from the first DFS span
+        assert_eq!(result.root_operation_name, "early");
+    }
+
+    // ── duration and timeline math ────────────────────────────────────────
+
+    #[test]
+    fn test_trace_duration_uses_global_min_max() {
+        // child starts before root and ends after — trace duration must span all.
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "root",  "name": "root",
+                     "startTimeUnixNano": 2000, "endTimeUnixNano": 3000},
+                    {"traceId": "t", "spanId": "child", "parentSpanId": "root",
+                     "name": "child", "startTimeUnixNano": 1000, "endTimeUnixNano": 4000}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.start_time_unix_nano, 1_000);
+        assert_eq!(result.duration_ns, 3_000); // 4000 - 1000
+    }
+
+    #[test]
+    fn test_relative_start_and_gantt_percentages() {
+        // root: [1000, 5000], child: [2000, 3000]
+        // trace_duration = 4000
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "root",  "name": "root",
+                     "startTimeUnixNano": 1000, "endTimeUnixNano": 5000},
+                    {"traceId": "t", "spanId": "child", "parentSpanId": "root",
+                     "name": "child", "startTimeUnixNano": 2000, "endTimeUnixNano": 3000}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        let root  = result.spans.iter().find(|s| s.span_id == "root").unwrap();
+        let child = result.spans.iter().find(|s| s.span_id == "child").unwrap();
+
+        assert_eq!(root.relative_start_ns, 0);
+        assert_eq!(root.duration_ns, 4_000);
+        assert!((root.relative_start_pct - 0.0).abs() < f64::EPSILON);
+        assert!((root.duration_pct - 1.0).abs() < f64::EPSILON);
+
+        assert_eq!(child.relative_start_ns, 1_000);
+        assert_eq!(child.duration_ns, 1_000);
+        assert!((child.relative_start_pct - 0.25).abs() < f64::EPSILON);
+        assert!((child.duration_pct - 0.25).abs() < f64::EPSILON);
+    }
+
+    // ── service name ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_service_name_from_resource_attribute() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": [
+                {"key": "service.name", "value": {"stringValue": "payment-service"}}
+            ]},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s1", "name": "charge",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.spans[0].service_name, "payment-service");
+        assert_eq!(result.root_service_name, "payment-service");
+    }
+
+    #[test]
+    fn test_missing_service_name_defaults_to_unknown() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s1", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.spans[0].service_name, "unknown");
+    }
+
+    // ── error counting ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_error_count_from_status_code() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "ok01", "name": "ok",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100,
+                     "status": {"code": "STATUS_CODE_OK"}},
+                    {"traceId": "t", "spanId": "err1", "name": "fail",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100,
+                     "status": {"code": "STATUS_CODE_ERROR"}},
+                    {"traceId": "t", "spanId": "err2", "name": "fail2",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100,
+                     "status": {"code": "STATUS_CODE_ERROR"}}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.error_count, 2);
+        assert!(!result.spans.iter().find(|s| s.span_id == "ok01").unwrap().has_error);
+        assert!(result.spans.iter().find(|s| s.span_id == "err1").unwrap().has_error);
+    }
+
+    // ── span format variants ──────────────────────────────────────────────
+
+    #[test]
+    fn test_scope_spans_key_accepted() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "scopeSpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s1", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.span_count, 1);
+    }
+
+    #[test]
+    fn test_both_span_keys_merged_in_same_batch() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "ils", "name": "ils",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}],
+                "scopeSpans": [{"spans": [
+                    {"traceId": "t", "spanId": "ss", "name": "ss",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.span_count, 2);
+    }
+
+    // ── service count ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_service_count_is_distinct_services() {
+        let json = r#"{
+            "batches": [
+                {"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "svc-a"}}]},
+                 "instrumentationLibrarySpans": [{"spans": [
+                     {"traceId": "t", "spanId": "a1", "name": "op", "startTimeUnixNano": 0, "endTimeUnixNano": 100},
+                     {"traceId": "t", "spanId": "a2", "name": "op", "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                 ]}]},
+                {"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "svc-b"}}]},
+                 "instrumentationLibrarySpans": [{"spans": [
+                     {"traceId": "t", "spanId": "b1", "name": "op", "startTimeUnixNano": 0, "endTimeUnixNano": 100}
+                 ]}]}
+            ]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert_eq!(result.service_count, 2);
+        assert_eq!(result.span_count, 3);
+    }
+
+    // ── attribute value types ─────────────────────────────────────────────
+
+    #[test]
+    fn test_attribute_string_value() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 1,
+                     "attributes": [{"key": "http.method", "value": {"stringValue": "GET"}}]}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        let attr = &result.spans[0].attributes[0];
+        assert_eq!(attr.key, "http.method");
+        assert!(matches!(&attr.value, AnyValue::StringValue { string_value } if string_value == "GET"));
+    }
+
+    #[test]
+    fn test_attribute_bool_value() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 1,
+                     "attributes": [{"key": "cache.hit", "value": {"boolValue": true}}]}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert!(matches!(&result.spans[0].attributes[0].value, AnyValue::BoolValue { bool_value } if *bool_value));
+    }
+
+    #[test]
+    fn test_attribute_int_value_as_number() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 1,
+                     "attributes": [{"key": "http.status_code", "value": {"intValue": 200}}]}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert!(matches!(&result.spans[0].attributes[0].value, AnyValue::IntValue { int_value } if *int_value == 200));
+    }
+
+    #[test]
+    fn test_attribute_int_value_as_string_encoded() {
+        // Tempo exports intValue as a quoted string: {"intValue": "443"}
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 1,
+                     "attributes": [{"key": "net.peer.port", "value": {"intValue": "443"}}]}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert!(matches!(&result.spans[0].attributes[0].value, AnyValue::IntValue { int_value } if *int_value == 443));
+    }
+
+    #[test]
+    fn test_attribute_double_value() {
+        let json = r#"{
+            "batches": [{"resource": {"attributes": []},
+                "instrumentationLibrarySpans": [{"spans": [
+                    {"traceId": "t", "spanId": "s", "name": "op",
+                     "startTimeUnixNano": 0, "endTimeUnixNano": 1,
+                     "attributes": [{"key": "score", "value": {"doubleValue": 0.95}}]}
+                ]}]
+            }]
+        }"#;
+        let result = parse_trace_str(json).unwrap();
+        assert!(matches!(&result.spans[0].attributes[0].value, AnyValue::DoubleValue { double_value } if (*double_value - 0.95).abs() < f64::EPSILON));
     }
 }

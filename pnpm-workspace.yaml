@@ -1,0 +1,6 @@
+overrides:
+  serialize-javascript: ">=7.0.5"
+allowBuilds:
+  esbuild: true
+  edgedriver: false
+  geckodriver: false

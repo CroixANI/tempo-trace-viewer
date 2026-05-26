@@ -52,6 +52,65 @@ cargo tauri dev
 
 ---
 
+## Testing
+
+### Rust unit tests
+
+Run the parser and model unit tests. No app build or browser required.
+
+```bash
+cargo test
+```
+
+All 22 tests in `src-tauri/src/parser/trace_parser.rs` exercise the parser in isolation using
+inline JSON fixtures and the real example trace file from `docs/examples/`.
+
+---
+
+### Frontend component tests (Playwright)
+
+Run the Svelte component tests against the Vite dev server with Tauri IPC mocked.
+No compiled Tauri binary required.
+
+```bash
+pnpm test
+```
+
+The Vite dev server starts automatically on port 1420. Tests are in `tests/trace-header.spec.ts`.
+
+---
+
+### Full E2E tests (WebdriverIO + tauri-driver)
+
+Run the end-to-end tests against the real compiled Tauri app using `tauri-driver`. These tests
+exercise the Rust parser through real IPC with the example trace file.
+
+> **Platform note:** `tauri-driver` only supports **Linux and Windows**. It does not run on macOS
+> (the binary exits immediately on that platform). Run these tests on Linux (e.g. Ubuntu in CI) or
+> Windows.
+
+**One-time setup (Linux/Windows):**
+
+```bash
+# 1. Install tauri-driver
+cargo install tauri-driver
+
+# 2. Build the debug app bundle
+cargo tauri build --debug
+```
+
+**Run the tests:**
+
+```bash
+pnpm test:e2e
+```
+
+Tests are in `tests/e2e/trace-header.e2e.ts`.
+The debug command `load_trace_from_path` (only registered in debug builds) is used to bypass
+the native file dialog and load the example trace directly from disk.
+
+---
+
 ## Documentation
 
 - **[PRD](docs/PRD.md)** — problem statement, features, performance targets
