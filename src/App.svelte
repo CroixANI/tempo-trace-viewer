@@ -2,12 +2,14 @@
   import Toolbar from './lib/components/Toolbar.svelte';
   import TraceHeader from './lib/components/TraceHeader.svelte';
   import SpanTree from './lib/components/SpanTree.svelte';
+  import SpanDetail from './lib/components/SpanDetail.svelte';
 </script>
 
 <div class="app">
   <Toolbar />
   <TraceHeader />
   <SpanTree />
+  <SpanDetail />
 </div>
 
 <style>
